@@ -91,13 +91,13 @@ def update_content(selected_provinces, page_current, page_size):
     # Create the choropleth map figure
     fig_map = go.Figure()
 
-    # Default provinces (non-selected)
+    # Add all provinces with a default color
     fig_map.add_trace(go.Choroplethmapbox(
         geojson=provinces,
         locations=df['schools_province'],
         z=df['totalstd'],
         featureidkey="properties.pro_th",
-        colorscale='Inferno',
+        colorscale='Inferno',  # Default color scale
         marker_opacity=0.5,
         marker_line_width=0.5,
         showscale=True
@@ -113,9 +113,9 @@ def update_content(selected_provinces, page_current, page_size):
         fig_map.add_trace(go.Choroplethmapbox(
             geojson=selected_provinces_geojson,
             locations=[feature['properties']['pro_th'] for feature in selected_provinces_geojson['features']],
-            z=[df[df['schools_province'] == prov]['totalstd'].values[0] for prov in selected_provinces],
+            z=[1] * len(selected_provinces),  # Use a constant value to maintain the highlight color
             featureidkey="properties.pro_th",
-            colorscale="RdBu",
+            colorscale=[[0, 'rgba(255,0,0,0.7)'], [1, 'rgba(255,0,0,0.7)']],  # Fixed highlight color
             marker_opacity=0.7,
             marker_line_width=2,
             marker_line_color='DarkRed',
