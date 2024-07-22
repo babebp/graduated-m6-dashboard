@@ -28,7 +28,7 @@ app.layout = html.Div([
     
     # Navigation bar
     html.Nav([
-        html.Div("Graduated M6 Student 2566 Dashboard", style={'fontSize': 24, 'padding': '10px'}),
+        html.Div("Graduated M6 Student 2566 Dashboard", style={'fontSize': 24, 'padding': '10px', 'color': 'white'}),
         html.Div([
             dcc.Dropdown(
                 id='province-dropdown',
@@ -41,8 +41,8 @@ app.layout = html.Div([
     ], style={
         'display': 'flex',
         'alignItems': 'center',
-        'backgroundColor': '#f8f9fa',
-        'borderBottom': '1px solid #ddd'
+        'backgroundColor': '#343a40',
+        'borderBottom': '1px solid #ddd',
     }),
     
     html.Div([
