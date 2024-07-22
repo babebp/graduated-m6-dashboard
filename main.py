@@ -174,7 +174,6 @@ def update_content(dropdown_values, page_current, clickData, page_size, stored_p
                 marker=dict(
                     color=norm_totalstd,
                     colorscale=color_scale,
-                    # colorbar=dict(title='Total Students'),
                 ),
             ))
     else:
@@ -190,7 +189,6 @@ def update_content(dropdown_values, page_current, clickData, page_size, stored_p
                 marker=dict(
                     color=norm_totalstd,
                     colorscale=color_scale,
-                    # colorbar=dict(title='Total Students'),
                 ),
             ))
 
