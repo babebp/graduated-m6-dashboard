@@ -2,8 +2,8 @@ import pandas as pd
 import json
 from urllib.request import urlopen
 import plotly.graph_objects as go
-from dash import Dash, dcc, html, dash_table
-from dash.dependencies import Input, Output
+from dash import Dash, dcc, html, dash_table, ctx
+from dash.dependencies import Input, Output, State
 
 # Load geojson for provinces
 with urlopen("https://raw.githubusercontent.com/chingchai/OpenGISData-Thailand/master/provinces.geojson") as response:
@@ -19,6 +19,9 @@ app = Dash(__name__)
 
 # Define the layout
 app.layout = html.Div([
+    # Hidden store to manage selected provinces
+    dcc.Store(id='selected-provinces-store', data=[]),
+    
     # Navigation bar
     html.Nav([
         html.Div("Graduated M6 Student 2566 Dashboard", style={'fontSize': 24, 'padding': '10px'}),
@@ -26,7 +29,7 @@ app.layout = html.Div([
             dcc.Dropdown(
                 id='province-dropdown',
                 options=[{'label': prov, 'value': prov} for prov in df.schools_province.unique()],
-                value=[],
+                value=[],  # Default empty selection
                 multi=True,
                 style={'width': '300px'}
             )
@@ -44,13 +47,14 @@ app.layout = html.Div([
             dcc.Graph(
                 id='choropleth-map',
                 config={'scrollZoom': True},
-                style={'width': '100%', 'height': 'calc(100vh - 120px)'}  # Adjust height accordingly
+                style={'width': '100%', 'height': 'calc(100vh - 120px)'},
+                clickData=None  # Initialize with None
             ),
         ], style={'flex': 1, 'padding': '10px'}),
         html.Div([
             dcc.Graph(
                 id='bar-chart',
-                style={'width': '100%', 'height': '50%'}  # Adjust height as needed
+                style={'width': '100%', 'height': '50%'}
             ),
             # Data Table
             dash_table.DataTable(
@@ -66,25 +70,44 @@ app.layout = html.Div([
                 page_current=0,  # Start with the first page
                 style_cell={'textAlign': 'left'},
             )
-            # Bar Chart
-            
         ], style={'flex': 1, 'padding': '10px'})
-    ], style={"display": "flex", "flexDirection": "row", 'width': "100%", 'padding': '10px 0 10px 0'})
+    ], style={"display": "flex", "flexDirection": "row", 'width': "100%", 'padding': '10px 0'})
 ])
 
-# Define the callback to update the map, table, and bar chart
-from dash.dependencies import Input, Output, State
-
+# Define the callback to update the map, table, bar chart, and dropdown
 @app.callback(
     [Output('choropleth-map', 'figure'),
      Output('data-table', 'data'),
      Output('bar-chart', 'figure'),
-     Output('province-dropdown', 'value')],
+     Output('province-dropdown', 'value'),
+     Output('selected-provinces-store', 'data')],
     [Input('province-dropdown', 'value'),
-     Input('data-table', 'page_current')],
-    [State('data-table', 'page_size')]
+     Input('data-table', 'page_current'),
+     Input('choropleth-map', 'clickData')],
+    [State('data-table', 'page_size'),
+     State('selected-provinces-store', 'data')]
 )
-def update_content(selected_provinces, page_current, page_size):
+def update_content(dropdown_values, page_current, clickData, page_size, stored_provinces):
+    # Initialize selected_provinces with stored value
+    selected_provinces = stored_provinces or []
+
+    # Handle map click interaction
+    if clickData:
+        clicked_province = clickData['points'][0]['location']
+        if clicked_province in selected_provinces:
+            # Remove the province if it's already selected
+            selected_provinces.remove(clicked_province)
+        else:
+            # Add the province if it's not already selected
+            selected_provinces.append(clicked_province)
+    
+    # Ensure no duplicates in selected_provinces
+    selected_provinces = list(set(selected_provinces))
+
+    # Handle dropdown updates
+    if ctx.triggered_id == 'province-dropdown':
+        selected_provinces = dropdown_values or []
+
     # Filter data based on selected provinces
     filtered_df = df[df['schools_province'].isin(selected_provinces)] if selected_provinces else df
 
@@ -97,7 +120,7 @@ def update_content(selected_provinces, page_current, page_size):
         locations=df['schools_province'],
         z=df['totalstd'],
         featureidkey="properties.pro_th",
-        colorscale='Inferno',  # Default color scale
+        colorscale='Inferno',
         marker_opacity=0.5,
         marker_line_width=0.5,
         showscale=True
@@ -113,9 +136,9 @@ def update_content(selected_provinces, page_current, page_size):
         fig_map.add_trace(go.Choroplethmapbox(
             geojson=selected_provinces_geojson,
             locations=[feature['properties']['pro_th'] for feature in selected_provinces_geojson['features']],
-            z=[1] * len(selected_provinces),  # Use a constant value to maintain the highlight color
+            z=[1] * len(selected_provinces),
             featureidkey="properties.pro_th",
-            colorscale=[[0, 'rgba(255,0,0,0.7)'], [1, 'rgba(255,0,0,0.7)']],  # Fixed highlight color
+            colorscale=[[0, 'rgba(255,0,0,0.7)'], [1, 'rgba(255,0,0,0.7)']],
             marker_opacity=0.7,
             marker_line_width=2,
             marker_line_color='DarkRed',
@@ -164,9 +187,7 @@ def update_content(selected_provinces, page_current, page_size):
     # Update table data based on selected provinces
     table_data = filtered_df.to_dict('records')
 
-    return fig_map, table_data, fig_bar, selected_provinces
-
-
+    return fig_map, table_data, fig_bar, selected_provinces, selected_provinces
 
 # Run the server
 if __name__ == '__main__':
