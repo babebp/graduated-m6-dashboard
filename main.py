@@ -2,6 +2,7 @@ import pandas as pd
 import json
 from urllib.request import urlopen
 import plotly.graph_objects as go
+import plotly.colors
 from dash import Dash, dcc, html, dash_table, ctx
 from dash.dependencies import Input, Output, State
 
@@ -13,6 +14,9 @@ with urlopen("https://raw.githubusercontent.com/chingchai/OpenGISData-Thailand/m
 with urlopen("https://gpa.obec.go.th/reportdata/pp3-4_2566_province.json") as response:
     data = json.load(response)
     df = pd.DataFrame(data)
+
+# Ensure 'totalstd' is numeric
+df['totalstd'] = pd.to_numeric(df['totalstd'], errors='coerce')
 
 # Initialize the Dash app
 app = Dash(__name__)
@@ -95,10 +99,8 @@ def update_content(dropdown_values, page_current, clickData, page_size, stored_p
     if clickData:
         clicked_province = clickData['points'][0]['location']
         if clicked_province in selected_provinces:
-            # Remove the province if it's already selected
             selected_provinces.remove(clicked_province)
         else:
-            # Add the province if it's not already selected
             selected_provinces.append(clicked_province)
     
     # Ensure no duplicates in selected_provinces
@@ -111,6 +113,11 @@ def update_content(dropdown_values, page_current, clickData, page_size, stored_p
     # Filter data based on selected provinces
     filtered_df = df[df['schools_province'].isin(selected_provinces)] if selected_provinces else df
 
+    # Define the color scale to be used in both the map and the bar chart
+    color_scale = plotly.colors.get_colorscale('Inferno')
+    min_std = df['totalstd'].min()
+    max_std = df['totalstd'].max()
+
     # Create the choropleth map figure
     fig_map = go.Figure()
 
@@ -120,7 +127,8 @@ def update_content(dropdown_values, page_current, clickData, page_size, stored_p
         locations=df['schools_province'],
         z=df['totalstd'],
         featureidkey="properties.pro_th",
-        colorscale='Inferno',
+        colorscale=color_scale,
+        colorbar=dict(title='Total Students'),
         marker_opacity=0.5,
         marker_line_width=0.5,
         showscale=True
@@ -154,23 +162,36 @@ def update_content(dropdown_values, page_current, clickData, page_size, stored_p
 
     # Create the bar chart figure
     fig_bar = go.Figure()
+
     if selected_provinces:
         if not filtered_df.empty:
             sorted_df = filtered_df.sort_values(by='totalstd')
+            # Normalize using the full dataset
+            norm_totalstd = (sorted_df['totalstd'] - min_std) / (max_std - min_std)
             fig_bar.add_trace(go.Bar(
                 x=sorted_df['schools_province'],
                 y=sorted_df['totalstd'],
-                marker_color='LightSkyBlue'
+                marker=dict(
+                    color=norm_totalstd,
+                    colorscale=color_scale,
+                    # colorbar=dict(title='Total Students'),
+                ),
             ))
     else:
         # Use data from the current page of the table if no provinces are selected
         page_df = df.iloc[page_current * page_size : (page_current + 1) * page_size]
         if not page_df.empty:
             sorted_page_df = page_df.sort_values(by='totalstd')
+            # Normalize using the full dataset
+            norm_totalstd = (sorted_page_df['totalstd'] - min_std) / (max_std - min_std)
             fig_bar.add_trace(go.Bar(
                 x=sorted_page_df['schools_province'],
                 y=sorted_page_df['totalstd'],
-                marker_color='LightSkyBlue'
+                marker=dict(
+                    color=norm_totalstd,
+                    colorscale=color_scale,
+                    # colorbar=dict(title='Total Students'),
+                ),
             ))
 
     fig_bar.update_layout(
